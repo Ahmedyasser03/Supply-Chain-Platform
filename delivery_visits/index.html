@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Delivery & Material Lookup</title>
+<title>Delivery Visits</title>
 
 <style>
 body {
@@ -10,193 +10,133 @@ body {
   background:#f4f4f4;
   padding:20px;
 }
-
-.container {
-  max-width:1000px;
-  margin:auto;
-  background:#fff;
-  padding:25px;
-  border-radius:10px;
-}
-
-select, input, button {
+select, input {
   padding:8px;
-  width:100%;
-  margin-top:8px;
+  margin:10px 0;
+  width:300px;
 }
-
-button {
-  background:#007bff;
-  color:white;
-  border:none;
-  border-radius:5px;
-  cursor:pointer;
-}
-
-.result {
-  margin-top:15px;
-  background:#f1f1f1;
-  padding:15px;
-  border-radius:8px;
-}
-
-.grid {
-  display:grid;
-  grid-template-columns:repeat(6,1fr);
-  gap:8px;
-}
-
 .box {
-  background:#e9f2ff;
-  padding:10px;
-  text-align:center;
-  border-radius:6px;
-  font-weight:bold;
+  background:#fff;
+  padding:15px;
+  margin-top:15px;
+  border-radius:8px;
+  box-shadow:0 2px 5px rgba(0,0,0,.2);
+}
+h3 {
+  margin-top:0;
 }
 </style>
 </head>
 
 <body>
 
-<div class="container">
+<h2>Delivery Visits</h2>
 
-<h2>Store Filter</h2>
-
-<label>STORE</label>
+<!-- STORE DROPLIST -->
+<label>Select Store</label><br>
 <select id="storeSelect">
-  <option value="">-- Select STORE --</option>
+  <option value="">-- Select Store --</option>
 </select>
 
-<div id="visitResult" class="result" style="display:none;"></div>
+<!-- MATERIAL SEARCH -->
+<br>
+<label>Search Material (Number or Description)</label><br>
+<input type="text" id="materialSearch" placeholder="e.g. 102468 or Omiz">
 
-<hr>
+<!-- OUTPUT 1 -->
+<div class="box">
+  <h3>OUTPUT #1 – Delivery Info</h3>
+  <div id="output1">No data</div>
+</div>
 
-<h2>Material Search</h2>
-<label>Material OR Material Description</label>
-<input type="text" id="materialInput" placeholder="Search Material or Description">
-
-<button onclick="searchMaterial()">Search</button>
-
-<div id="materialResult" class="result" style="display:none;"></div>
-
+<!-- OUTPUT 2 -->
+<div class="box">
+  <h3>OUTPUT #2 – Material Availability</h3>
+  <div id="output2">No data</div>
 </div>
 
 <script>
-// ================= LINKS =================
-const DELIVERY_URL =
-'https://docs.google.com/spreadsheets/d/e/2PACX-1vSXlvP1WVT_NHTcqNPp-bv0_Renbo-PXFsLPOssgOi1TSjWjTuqRyUAH5boHUwoZsRUo5cvwT2I_1K-/pub?gid=0&single=true&output=csv';
+const deliveryURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSXlvP1WVT_NHTcqNPp-bv0_Renbo-PXFsLPOssgOi1TSjWjTuqRyUAH5boHUwoZsRUo5cvwT2I_1K-/pub?gid=0&single=true&output=csv";
+const availabilityURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQDJxjTG91GO_Lh5008Lrtl4ZcQnxOXY2O1P0BNVVWEDdRsJrIDnMPIWHAsoGJ7D1_R7og9It0woY_W/pub?gid=0&single=true&output=csv";
 
-const AVAIL_URL =
-'https://docs.google.com/spreadsheets/d/e/2PACX-1vQDJxjTG91GO_Lh5008Lrtl4ZcQnxOXY2O1P0BNVVWEDdRsJrIDnMPIWHAsoGJ7D1_R7og9It0woY_W/pub?gid=0&single=true&output=csv';
+let deliveryData = [];
+let availabilityData = [];
+let selectedWH = "";
 
-// ================= DATA =================
-let delivery = [];
-let availability = [];
-
-// ================= LOAD DELIVERY =================
-fetch(DELIVERY_URL)
-.then(r => r.text())
-.then(csv => {
-  const rows = csv.trim().split('\n').map(r => r.split(','));
-
-  const storeSet = new Set();
-
-  rows.slice(1).forEach(r => {
-    const row = {
-      city: r[0],
-      wh: r[1],
-      store: r[2],
-      first: r[3],
-      second: r[4],
-      third: r[5]
-    };
-    delivery.push(row);
-    storeSet.add(row.store);
+/* CSV TO ARRAY */
+function csvToArray(csv) {
+  const lines = csv.trim().split("\n");
+  const headers = lines.shift().split(",");
+  return lines.map(line => {
+    const obj = {};
+    line.split(",").forEach((v,i)=>obj[headers[i].trim()] = v.trim());
+    return obj;
   });
+}
 
-  // 🔥 DROPLIST = STORE ONLY
-  const sel = document.getElementById('storeSelect');
-  [...storeSet].sort().forEach(store => {
-    const opt = document.createElement('option');
-    opt.value = store;
-    opt.textContent = store;
-    sel.appendChild(opt);
-  });
+/* LOAD DATA */
+Promise.all([
+  fetch(deliveryURL).then(r=>r.text()),
+  fetch(availabilityURL).then(r=>r.text())
+]).then(([d,a])=>{
+  deliveryData = csvToArray(d);
+  availabilityData = csvToArray(a);
+  fillStoreList();
 });
 
-// ================= LOAD AVAILABILITY =================
-fetch(AVAIL_URL)
-.then(r => r.text())
-.then(csv => {
-  const rows = csv.trim().split('\n').map(r => r.split(','));
-  rows.slice(1).forEach(r => {
-    availability.push({
-      material: r[0].trim(),
-      desc: r[1].trim(),
-      wh1: r[2],
-      wh2: r[3]
-    });
+/* FILL STORE DROPLIST */
+function fillStoreList() {
+  const stores = [...new Set(deliveryData.map(d=>d.STORE))].sort();
+  const sel = document.getElementById("storeSelect");
+  stores.forEach(s=>{
+    const op = document.createElement("option");
+    op.value = s;
+    op.textContent = s;
+    sel.appendChild(op);
   });
-});
+}
 
-// ================= STORE CHANGE =================
-document.getElementById('storeSelect').addEventListener('change', function () {
-  const d = delivery.find(x => x.store === this.value);
-  if (!d) return;
+/* STORE CHANGE */
+document.getElementById("storeSelect").addEventListener("change", function(){
+  const store = this.value;
+  const row = deliveryData.find(d=>d.STORE === store);
+  if(!row) return;
 
-  document.getElementById('visitResult').innerHTML = `
-    <div class="grid">
-      <div class="box">${d.city}</div>
-      <div class="box">${d.wh}</div>
-      <div class="box">${d.store}</div>
-      <div class="box">${d.first || '-'}</div>
-      <div class="box">${d.second || '-'}</div>
-      <div class="box">${d.third || '-'}</div>
-    </div>
+  selectedWH = row.wh.toUpperCase();
+
+  document.getElementById("output1").innerHTML = `
+    <b>City:</b> ${row.city}<br>
+    <b>WH:</b> ${row.wh}<br>
+    <b>Store:</b> ${row.STORE}<br>
+    <b>1ST:</b> ${row["1ST"]}<br>
+    <b>2ND:</b> ${row["2ND"]}<br>
+    <b>3RD:</b> ${row["3RD"]}
   `;
-  document.getElementById('visitResult').style.display = 'block';
 });
 
-// ================= MATERIAL SEARCH =================
-function searchMaterial() {
-  const q = document.getElementById('materialInput').value
-            .trim().toLowerCase();
-  const store = document.getElementById('storeSelect').value;
+/* MATERIAL SEARCH */
+document.getElementById("materialSearch").addEventListener("input", function(){
+  const val = this.value.toLowerCase();
+  if(val.length < 2 || !selectedWH) return;
 
-  if (!q) {
-    alert('Enter Material or Description');
-    return;
-  }
-  if (!store) {
-    alert('Select STORE first');
-    return;
-  }
-
-  const d = delivery.find(x => x.store === store);
-
-  // 🔥 SEARCH BY MATERIAL OR DESCRIPTION
-  const m = availability.find(x =>
-    x.material.toLowerCase().includes(q) ||
-    x.desc.toLowerCase().includes(q)
+  const row = availabilityData.find(a =>
+    a.Material.toLowerCase().includes(val) ||
+    a["Material Description"].toLowerCase().includes(val)
   );
 
-  if (!m) {
-    document.getElementById('materialResult').innerText =
-      'Material not found';
-    document.getElementById('materialResult').style.display = 'block';
+  if(!row){
+    document.getElementById("output2").innerHTML = "No material found";
     return;
   }
 
-  const value = d.wh === 'W1' ? m.wh1 : m.wh2;
+  const status = selectedWH === "W1" ? row.wh1 : row.wh2;
 
-  document.getElementById('materialResult').innerHTML = `
-    <b>Material:</b> ${m.material}<br>
-    <b>Description:</b> ${m.desc}<br>
-    <b>WH:</b> ${d.wh}<br>
-    <b>Availability:</b> ${value}
+  document.getElementById("output2").innerHTML = `
+    <b>Material:</b> ${row.Material}<br>
+    <b>Description:</b> ${row["Material Description"]}<br>
+    <b>Status:</b> ${status}
   `;
-  document.getElementById('materialResult').style.display = 'block';
-}
+});
 </script>
 
 </body>
