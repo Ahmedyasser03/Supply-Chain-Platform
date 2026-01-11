@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Delivery Visits & Material Lookup</title>
+<title>Delivery & Material Lookup</title>
 
 <style>
 body {
@@ -12,7 +12,7 @@ body {
 }
 
 .container {
-  max-width:900px;
+  max-width:1000px;
   margin:auto;
   background:#fff;
   padding:25px;
@@ -42,9 +42,8 @@ button {
 
 .grid {
   display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:10px;
-  margin-top:10px;
+  grid-template-columns:repeat(6,1fr);
+  gap:8px;
 }
 
 .box {
@@ -60,11 +59,11 @@ button {
 <body>
 
 <div class="container">
-<h2>Delivery Visits</h2>
+<h2>Store Visits</h2>
 
-<label>Store</label>
+<label>STORE</label>
 <select id="storeSelect">
-  <option value="">-- Select Store --</option>
+  <option value="">-- Select STORE --</option>
 </select>
 
 <div id="visitResult" class="result" style="display:none;"></div>
@@ -72,8 +71,8 @@ button {
 <hr>
 
 <h2>Material Search</h2>
-<label>Material Number (6 digits)</label>
-<input type="text" id="materialInput" placeholder="Ex: 123456">
+<label>Material OR Material Description</label>
+<input type="text" id="materialInput" placeholder="Enter Material or Description">
 
 <button onclick="searchMaterial()">Search</button>
 
@@ -100,11 +99,12 @@ fetch(DELIVERY_URL)
 
   rows.slice(1).forEach(r => {
     delivery.push({
-      store: r[1],
-      first: r[2],
-      second: r[3],
-      third: r[4],
-      wh: r[5].toLowerCase()
+      city: r[0],
+      wh: r[1],
+      store: r[2],
+      first: r[3],
+      second: r[4],
+      third: r[5]
     });
   });
 
@@ -122,28 +122,30 @@ fetch(AVAIL_URL)
 .then(r => r.text())
 .then(csv => {
   const rows = csv.trim().split('\n').map(r => r.split(','));
+
   rows.slice(1).forEach(r => {
     availability.push({
       material: r[0],
-      w1: r[1],
-      w2: r[2],
-      w3: r[3],
-      w4: r[4]
+      desc: r[1],
+      wh1: r[2],
+      wh2: r[3]
     });
   });
 });
 
 // ================= STORE CHANGE =================
 document.getElementById('storeSelect').addEventListener('change', function () {
-  const s = delivery.find(d => d.store === this.value);
-  if (!s) return;
+  const d = delivery.find(x => x.store === this.value);
+  if (!d) return;
 
   document.getElementById('visitResult').innerHTML = `
     <div class="grid">
-      <div class="box">${s.first || '-'}</div>
-      <div class="box">${s.second || '-'}</div>
-      <div class="box">${s.third || '-'}</div>
-      <div class="box">WH: ${s.wh.toUpperCase()}</div>
+      <div class="box">${d.city}</div>
+      <div class="box">${d.wh}</div>
+      <div class="box">${d.store}</div>
+      <div class="box">${d.first || '-'}</div>
+      <div class="box">${d.second || '-'}</div>
+      <div class="box">${d.third || '-'}</div>
     </div>
   `;
   document.getElementById('visitResult').style.display = 'block';
@@ -151,21 +153,24 @@ document.getElementById('storeSelect').addEventListener('change', function () {
 
 // ================= MATERIAL SEARCH =================
 function searchMaterial() {
-  const mat = document.getElementById('materialInput').value.trim();
+  const q = document.getElementById('materialInput').value.trim().toLowerCase();
   const store = document.getElementById('storeSelect').value;
 
-  if (!/^\d{6}$/.test(mat)) {
-    alert('Material Number must be 6 digits');
+  if (!q) {
+    alert('Enter Material or Description');
     return;
   }
 
   if (!store) {
-    alert('Select Store first');
+    alert('Select STORE first');
     return;
   }
 
   const d = delivery.find(x => x.store === store);
-  const m = availability.find(x => x.material === mat);
+  const m = availability.find(x =>
+    x.material.toLowerCase().includes(q) ||
+    x.desc.toLowerCase().includes(q)
+  );
 
   if (!m) {
     document.getElementById('materialResult').innerText = 'Material not found';
@@ -173,12 +178,12 @@ function searchMaterial() {
     return;
   }
 
-  const value = m[d.wh];
+  const value = d.wh === 'W1' ? m.wh1 : m.wh2;
 
   document.getElementById('materialResult').innerHTML = `
-    <b>Store:</b> ${store}<br>
-    <b>WH:</b> ${d.wh.toUpperCase()}<br>
-    <b>Material:</b> ${mat}<br>
+    <b>Material:</b> ${m.material}<br>
+    <b>Description:</b> ${m.desc}<br>
+    <b>WH:</b> ${d.wh}<br>
     <b>Value:</b> ${value}
   `;
   document.getElementById('materialResult').style.display = 'block';
