@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Delivery Visits Lookup</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 30px;
+      background-color: #f5f5f5;
+    }
+    h2 {
+      color: #333;
+    }
+    select {
+      padding: 5px;
+      font-size: 16px;
+    }
+    table {
+      margin-top: 20px;
+      border-collapse: collapse;
+      width: 400px;
+      background-color: #fff;
+      box-shadow: 0 0 5px rgba(0,0,0,0.2);
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px 12px;
+      text-align: center;
+    }
+    th {
+      background-color: #eee;
+    }
+  </style>
+</head>
+<body>
+  <h2>Delivery Visits Lookup</h2>
+
+  <label for="plant">Select Plant:</label>
+  <select id="plant">
+    <option value="">--Select Plant--</option>
+  </select>
+
+  <table id="visit-table" style="display:none;">
+    <tr>
+      <th>Visit Date</th>
+      <th>1st</th>
+      <th>2nd</th>
+      <th>3rd</th>
+    </tr>
+    <tr>
+      <td id="store-name"></td>
+      <td id="1st"></td>
+      <td id="2nd"></td>
+      <td id="3rd"></td>
+    </tr>
+  </table>
+
+  <script>
+    // رابط Google Sheet المنشور كـ CSV
+    const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSXlvP1WVT_NHTcqNPp-bv0_Renbo-PXFsLPOssgOi1TSjWjTuqRyUAH5boHUwoZsRUo5cvwT2I_1K-/pub?gid=0&single=true&output=csv';
+
+    let data = [];
+
+    // تحميل البيانات من Google Sheet CSV
+    fetch(sheetUrl)
+      .then(response => response.text())
+      .then(text => {
+        const rows = text.trim().split('\n').map(r => r.split(','));
+        // حذف الهيدر
+        data = rows.slice(1).map(r => ({
+          city: r[0],
+          store: r[1],
+          first: r[2] || '',
+          second: r[3] || '',
+          third: r[4] || ''
+        }));
+
+        // ملء Dropdown بالـ Plants
+        const dropdown = document.getElementById('plant');
+        data.forEach(d => {
+          const option = document.createElement('option');
+          option.value = d.store;
+          option.text = d.store;
+          dropdown.appendChild(option);
+        });
+      });
+
+    // عند اختيار Plant
+    document.getElementById('plant').addEventListener('change', function() {
+      const selected = this.value;
+      const visit = data.find(d => d.store === selected);
+
+      if (visit) {
+        document.getElementById('store-name').textContent = visit.store;
+        document.getElementById('1st').textContent = visit.first;
+        document.getElementById('2nd').textContent = visit.second;
+        document.getElementById('3rd').textContent = visit.third;
+        document.getElementById('visit-table').style.display = 'table';
+      } else {
+        document.getElementById('store-name').textContent = '';
+        document.getElementById('1st').textContent = '';
+        document.getElementById('2nd').textContent = '';
+        document.getElementById('3rd').textContent = '';
+        document.getElementById('visit-table').style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>
