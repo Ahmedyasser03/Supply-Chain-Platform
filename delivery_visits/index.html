@@ -59,7 +59,8 @@ button {
 <body>
 
 <div class="container">
-<h2>Store Visits</h2>
+
+<h2>Store Filter</h2>
 
 <label>STORE</label>
 <select id="storeSelect">
@@ -72,11 +73,12 @@ button {
 
 <h2>Material Search</h2>
 <label>Material OR Material Description</label>
-<input type="text" id="materialInput" placeholder="Enter Material or Description">
+<input type="text" id="materialInput" placeholder="Search Material or Description">
 
 <button onclick="searchMaterial()">Search</button>
 
 <div id="materialResult" class="result" style="display:none;"></div>
+
 </div>
 
 <script>
@@ -97,23 +99,28 @@ fetch(DELIVERY_URL)
 .then(csv => {
   const rows = csv.trim().split('\n').map(r => r.split(','));
 
+  const storeSet = new Set();
+
   rows.slice(1).forEach(r => {
-    delivery.push({
+    const row = {
       city: r[0],
       wh: r[1],
       store: r[2],
       first: r[3],
       second: r[4],
       third: r[5]
-    });
+    };
+    delivery.push(row);
+    storeSet.add(row.store);
   });
 
+  // 🔥 DROPLIST = STORE ONLY
   const sel = document.getElementById('storeSelect');
-  delivery.forEach(d => {
-    const o = document.createElement('option');
-    o.value = d.store;
-    o.textContent = d.store;
-    sel.appendChild(o);
+  [...storeSet].sort().forEach(store => {
+    const opt = document.createElement('option');
+    opt.value = store;
+    opt.textContent = store;
+    sel.appendChild(opt);
   });
 });
 
@@ -122,11 +129,10 @@ fetch(AVAIL_URL)
 .then(r => r.text())
 .then(csv => {
   const rows = csv.trim().split('\n').map(r => r.split(','));
-
   rows.slice(1).forEach(r => {
     availability.push({
-      material: r[0],
-      desc: r[1],
+      material: r[0].trim(),
+      desc: r[1].trim(),
       wh1: r[2],
       wh2: r[3]
     });
@@ -153,27 +159,30 @@ document.getElementById('storeSelect').addEventListener('change', function () {
 
 // ================= MATERIAL SEARCH =================
 function searchMaterial() {
-  const q = document.getElementById('materialInput').value.trim().toLowerCase();
+  const q = document.getElementById('materialInput').value
+            .trim().toLowerCase();
   const store = document.getElementById('storeSelect').value;
 
   if (!q) {
     alert('Enter Material or Description');
     return;
   }
-
   if (!store) {
     alert('Select STORE first');
     return;
   }
 
   const d = delivery.find(x => x.store === store);
+
+  // 🔥 SEARCH BY MATERIAL OR DESCRIPTION
   const m = availability.find(x =>
     x.material.toLowerCase().includes(q) ||
     x.desc.toLowerCase().includes(q)
   );
 
   if (!m) {
-    document.getElementById('materialResult').innerText = 'Material not found';
+    document.getElementById('materialResult').innerText =
+      'Material not found';
     document.getElementById('materialResult').style.display = 'block';
     return;
   }
@@ -184,7 +193,7 @@ function searchMaterial() {
     <b>Material:</b> ${m.material}<br>
     <b>Description:</b> ${m.desc}<br>
     <b>WH:</b> ${d.wh}<br>
-    <b>Value:</b> ${value}
+    <b>Availability:</b> ${value}
   `;
   document.getElementById('materialResult').style.display = 'block';
 }
