@@ -5,26 +5,24 @@
 <title>Delivery Visits</title>
 
 <style>
-body {
-  font-family: Arial, sans-serif;
+body{
+  font-family:Arial;
   background:#f4f4f4;
   padding:20px;
 }
-select, input {
+input, select{
   padding:8px;
-  margin:10px 0;
   width:300px;
+  margin:6px 0;
 }
-.box {
+.box{
   background:#fff;
   padding:15px;
   margin-top:15px;
   border-radius:8px;
   box-shadow:0 2px 5px rgba(0,0,0,.2);
 }
-h3 {
-  margin-top:0;
-}
+h3{margin-top:0}
 </style>
 </head>
 
@@ -32,44 +30,52 @@ h3 {
 
 <h2>Delivery Visits</h2>
 
-<!-- STORE DROPLIST -->
-<label>Select Store</label><br>
+<!-- STORE SEARCH -->
+<label>Search Store (Typing)</label><br>
+<input type="text" id="storeSearch" placeholder="P001">
+
+<br>
+
+<label>Select Store (Droplist)</label><br>
 <select id="storeSelect">
   <option value="">-- Select Store --</option>
 </select>
 
-<!-- MATERIAL SEARCH -->
-<br>
+<br><br>
+
 <label>Search Material (Number or Description)</label><br>
-<input type="text" id="materialSearch" placeholder="e.g. 102468 or Omiz">
+<input type="text" id="materialSearch" placeholder="102468 or Omiz">
 
 <!-- OUTPUT 1 -->
 <div class="box">
-  <h3>OUTPUT #1 – Delivery Info</h3>
+  <h3>OUTPUT #1 – Store Info</h3>
   <div id="output1">No data</div>
 </div>
 
 <!-- OUTPUT 2 -->
 <div class="box">
-  <h3>OUTPUT #2 – Material Availability</h3>
+  <h3>OUTPUT #2 – Availability</h3>
   <div id="output2">No data</div>
 </div>
 
 <script>
-const deliveryURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSXlvP1WVT_NHTcqNPp-bv0_Renbo-PXFsLPOssgOi1TSjWjTuqRyUAH5boHUwoZsRUo5cvwT2I_1K-/pub?gid=0&single=true&output=csv";
-const availabilityURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQDJxjTG91GO_Lh5008Lrtl4ZcQnxOXY2O1P0BNVVWEDdRsJrIDnMPIWHAsoGJ7D1_R7og9It0woY_W/pub?gid=0&single=true&output=csv";
+const deliveryURL =
+"https://docs.google.com/spreadsheets/d/e/2PACX-1vSXlvP1WVT_NHTcqNPp-bv0_Renbo-PXFsLPOssgOi1TSjWjTuqRyUAH5boHUwoZsRUo5cvwT2I_1K-/pub?gid=0&single=true&output=csv";
+
+const availabilityURL =
+"https://docs.google.com/spreadsheets/d/e/2PACX-1vQDJxjTG91GO_Lh5008Lrtl4ZcQnxOXY2O1P0BNVVWEDdRsJrIDnMPIWHAsoGJ7D1_R7og9It0woY_W/pub?gid=0&single=true&output=csv";
 
 let deliveryData = [];
 let availabilityData = [];
-let selectedWH = "";
+let currentWH = "";
 
-/* CSV TO ARRAY */
-function csvToArray(csv) {
+/* CSV PARSER */
+function csvToArray(csv){
   const lines = csv.trim().split("\n");
   const headers = lines.shift().split(",");
-  return lines.map(line => {
+  return lines.map(l=>{
     const obj = {};
-    line.split(",").forEach((v,i)=>obj[headers[i].trim()] = v.trim());
+    l.split(",").forEach((v,i)=>obj[headers[i].trim()] = v.trim());
     return obj;
   });
 }
@@ -84,25 +90,24 @@ Promise.all([
   fillStoreList();
 });
 
-/* FILL STORE DROPLIST */
-function fillStoreList() {
+/* DROPLIST */
+function fillStoreList(){
   const stores = [...new Set(deliveryData.map(d=>d.STORE))].sort();
   const sel = document.getElementById("storeSelect");
   stores.forEach(s=>{
-    const op = document.createElement("option");
-    op.value = s;
-    op.textContent = s;
-    sel.appendChild(op);
+    const o = document.createElement("option");
+    o.value = s;
+    o.textContent = s;
+    sel.appendChild(o);
   });
 }
 
-/* STORE CHANGE */
-document.getElementById("storeSelect").addEventListener("change", function(){
-  const store = this.value;
+/* SHOW STORE INFO */
+function showStore(store){
   const row = deliveryData.find(d=>d.STORE === store);
   if(!row) return;
 
-  selectedWH = row.wh.toUpperCase();
+  currentWH = row.wh.toUpperCase().trim();
 
   document.getElementById("output1").innerHTML = `
     <b>City:</b> ${row.city}<br>
@@ -112,16 +117,29 @@ document.getElementById("storeSelect").addEventListener("change", function(){
     <b>2ND:</b> ${row["2ND"]}<br>
     <b>3RD:</b> ${row["3RD"]}
   `;
+}
+
+/* DROPLIST EVENT */
+document.getElementById("storeSelect").addEventListener("change", e=>{
+  document.getElementById("storeSearch").value = e.target.value;
+  showStore(e.target.value);
+});
+
+/* SEARCH STORE EVENT */
+document.getElementById("storeSearch").addEventListener("input", e=>{
+  const v = e.target.value.toUpperCase();
+  document.getElementById("storeSelect").value = v;
+  showStore(v);
 });
 
 /* MATERIAL SEARCH */
 document.getElementById("materialSearch").addEventListener("input", function(){
-  const val = this.value.toLowerCase();
-  if(val.length < 2 || !selectedWH) return;
+  const v = this.value.toLowerCase();
+  if(!currentWH || v.length < 2) return;
 
   const row = availabilityData.find(a =>
-    a.Material.toLowerCase().includes(val) ||
-    a["Material Description"].toLowerCase().includes(val)
+    a.Material.toLowerCase().includes(v) ||
+    a["Material Description"].toLowerCase().includes(v)
   );
 
   if(!row){
@@ -129,7 +147,9 @@ document.getElementById("materialSearch").addEventListener("input", function(){
     return;
   }
 
-  const status = selectedWH === "W1" ? row.wh1 : row.wh2;
+  let status = "";
+  if(currentWH === "W1") status = row.wh1;
+  if(currentWH === "W2") status = row.wh2;
 
   document.getElementById("output2").innerHTML = `
     <b>Material:</b> ${row.Material}<br>
