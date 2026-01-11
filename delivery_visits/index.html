@@ -6,23 +6,26 @@
 
 <style>
 body{
-  font-family:Arial;
+  font-family: Arial;
   background:#f4f4f4;
   padding:20px;
 }
 input, select{
   padding:8px;
-  width:300px;
+  width:320px;
   margin:6px 0;
 }
-.box{
+.section{
   background:#fff;
   padding:15px;
   margin-top:15px;
   border-radius:8px;
   box-shadow:0 2px 5px rgba(0,0,0,.2);
 }
-h3{margin-top:0}
+.label{
+  font-weight:bold;
+  margin-top:10px;
+}
 </style>
 </head>
 
@@ -30,32 +33,26 @@ h3{margin-top:0}
 
 <h2>Delivery Visits</h2>
 
-<!-- STORE SEARCH -->
-<label>Search Store (Typing)</label><br>
-<input type="text" id="storeSearch" placeholder="P001">
+<div class="section">
+  <div class="label">Search Store</div>
+  <input type="text" id="storeSearch" placeholder="Type P001">
 
-<br>
-
-<label>Select Store (Droplist)</label><br>
-<select id="storeSelect">
-  <option value="">-- Select Store --</option>
-</select>
-
-<br><br>
-
-<label>Search Material (Number or Description)</label><br>
-<input type="text" id="materialSearch" placeholder="102468 or Omiz">
-
-<!-- OUTPUT 1 -->
-<div class="box">
-  <h3>OUTPUT #1 – Store Info</h3>
-  <div id="output1">No data</div>
+  <select id="storeSelect">
+    <option value="">Select Store</option>
+  </select>
 </div>
 
-<!-- OUTPUT 2 -->
-<div class="box">
-  <h3>OUTPUT #2 – Availability</h3>
-  <div id="output2">No data</div>
+<div class="section" id="deliveryInfo">
+  No store selected
+</div>
+
+<div class="section">
+  <div class="label">Search Material</div>
+  <input type="text" id="materialSearch" placeholder="102468 or Omiz">
+</div>
+
+<div class="section" id="materialInfo">
+  No material selected
 </div>
 
 <script>
@@ -67,34 +64,33 @@ const availabilityURL =
 
 let deliveryData = [];
 let availabilityData = [];
-let currentWH = "";
+let selectedWH = "";
 
-/* CSV PARSER */
+/* CSV */
 function csvToArray(csv){
   const lines = csv.trim().split("\n");
   const headers = lines.shift().split(",");
   return lines.map(l=>{
-    const obj = {};
-    l.split(",").forEach((v,i)=>obj[headers[i].trim()] = v.trim());
-    return obj;
+    const o = {};
+    l.split(",").forEach((v,i)=>o[headers[i].trim()] = v.trim());
+    return o;
   });
 }
 
-/* LOAD DATA */
+/* LOAD */
 Promise.all([
   fetch(deliveryURL).then(r=>r.text()),
   fetch(availabilityURL).then(r=>r.text())
 ]).then(([d,a])=>{
   deliveryData = csvToArray(d);
   availabilityData = csvToArray(a);
-  fillStoreList();
+  loadStores();
 });
 
-/* DROPLIST */
-function fillStoreList(){
-  const stores = [...new Set(deliveryData.map(d=>d.STORE))].sort();
+/* STORES */
+function loadStores(){
   const sel = document.getElementById("storeSelect");
-  stores.forEach(s=>{
+  [...new Set(deliveryData.map(d=>d.STORE))].sort().forEach(s=>{
     const o = document.createElement("option");
     o.value = s;
     o.textContent = s;
@@ -102,61 +98,62 @@ function fillStoreList(){
   });
 }
 
-/* SHOW STORE INFO */
+/* SHOW STORE */
 function showStore(store){
-  const row = deliveryData.find(d=>d.STORE === store);
-  if(!row) return;
+  const r = deliveryData.find(d=>d.STORE === store);
+  if(!r){
+    document.getElementById("deliveryInfo").innerHTML = "Store not found";
+    return;
+  }
 
-  currentWH = row.wh.toUpperCase().trim();
+  selectedWH = r.wh.toUpperCase();
 
-  document.getElementById("output1").innerHTML = `
-    <b>City:</b> ${row.city}<br>
-    <b>WH:</b> ${row.wh}<br>
-    <b>Store:</b> ${row.STORE}<br>
-    <b>1ST:</b> ${row["1ST"]}<br>
-    <b>2ND:</b> ${row["2ND"]}<br>
-    <b>3RD:</b> ${row["3RD"]}
+  document.getElementById("deliveryInfo").innerHTML = `
+    <b>City:</b> ${r.city}<br>
+    <b>Store:</b> ${r.STORE}<br>
+    <b>WH:</b> ${r.wh}<br>
+    <b>Visit Days:</b><br>
+    ${r["1ST"] || ""}<br>
+    ${r["2ND"] || ""}<br>
+    ${r["3RD"] || ""}
   `;
 }
 
-/* DROPLIST EVENT */
-document.getElementById("storeSelect").addEventListener("change", e=>{
-  document.getElementById("storeSearch").value = e.target.value;
+/* EVENTS */
+storeSelect.onchange = e=>{
+  storeSearch.value = e.target.value;
   showStore(e.target.value);
-});
+};
 
-/* SEARCH STORE EVENT */
-document.getElementById("storeSearch").addEventListener("input", e=>{
+storeSearch.oninput = e=>{
   const v = e.target.value.toUpperCase();
-  document.getElementById("storeSelect").value = v;
+  storeSelect.value = v;
   showStore(v);
-});
+};
 
 /* MATERIAL SEARCH */
-document.getElementById("materialSearch").addEventListener("input", function(){
+materialSearch.oninput = function(){
   const v = this.value.toLowerCase();
-  if(!currentWH || v.length < 2) return;
+  if(!selectedWH || v.length < 2) return;
 
-  const row = availabilityData.find(a =>
+  const r = availabilityData.find(a =>
     a.Material.toLowerCase().includes(v) ||
     a["Material Description"].toLowerCase().includes(v)
   );
 
-  if(!row){
-    document.getElementById("output2").innerHTML = "No material found";
+  if(!r){
+    materialInfo.innerHTML = "Material not found";
     return;
   }
 
-  let status = "";
-  if(currentWH === "W1") status = row.wh1;
-  if(currentWH === "W2") status = row.wh2;
+  const status = selectedWH === "W1" ? r.wh1 : r.wh2;
 
-  document.getElementById("output2").innerHTML = `
-    <b>Material:</b> ${row.Material}<br>
-    <b>Description:</b> ${row["Material Description"]}<br>
+  materialInfo.innerHTML = `
+    <b>Material:</b> ${r.Material}<br>
+    <b>Description:</b> ${r["Material Description"]}<br>
     <b>Status:</b> ${status}
   `;
-});
+};
 </script>
 
 </body>
